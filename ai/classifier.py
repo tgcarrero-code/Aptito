@@ -1,49 +1,38 @@
 import os
-import json
-import re
-import streamlit as st
 from openai import OpenAI
 
-_client = None
+_VALID = {"Vegano", "Vegetariano", "Ninguno"}
 
-def _get_client() -> OpenAI:
-    global _client
-    if _client is None:
-        # Try st.secrets first (Streamlit Cloud), then env var (local)
-        try:
-            api_key = st.secrets["DEEPSEEK_API_KEY"]
-        except Exception:
-            api_key = os.getenv("DEEPSEEK_API_KEY")
-        _client = OpenAI(
-            api_key=api_key,
-            base_url="https://api.deepseek.com",
-        )
-    return _client
+def _get_api_key():
+    try:
+        import streamlit as st
+        return st.secrets["DEEPSEEK_API_KEY"]
+    except Exception:
+        return os.environ.get("DEEPSEEK_API_KEY")
 
-def classify_dish(dish: str) -> dict:
-    client = _get_client()
-    system_prompt = (
-        "Eres un experto en nutrición y dietas vegetarianas y veganas. "
-        "Clasificas platos de comida peruana y limeña de forma precisa y consistente."
-    )
-    user_prompt = (
-        f'Clasifica el plato: "{dish}"\n'
-        'Responde ÚNICAMENTE con JSON: {"label": "vegano|vegetariano|no_apto", "reason": "explicación"}\n'
-        'Sin texto adicional ni markdown.'
-    )
+def classify_dish(dish_name: str) -> str:
+    api_key = _get_api_key()
+    if not api_key:
+        raise EnvironmentError("DEEPSEEK_API_KEY not set")
+    client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
     response = client.chat.completions.create(
         model="deepseek-chat",
         messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
+            {"role": "system", "content": "Eres un experto en nutrición. Clasifica el plato como exactamente una de estas tres categorías: 'Vegano', 'Vegetariano', o 'Ninguno'. Responde ÚNICAMENTE con esa palabra."},
+            {"role": "user", "content": f"Plato: {dish_name}"},
         ],
-        temperature=0.0,
-        max_tokens=150,
+        max_tokens=10,
+        temperature=0,
     )
-    content = response.choices[0].message.content.strip()
-    content = re.sub(r"```json\s*", "", content)
-    content = re.sub(r"```\s*", "", content).strip()
-    result = json.loads(content)
-    if result.get("label") not in ("vegano", "vegetariano", "no_apto"):
-        result["label"] = "no_apto"
-    return result
+    raw = response.choices[0].message.content.strip()
+    if raw in _VALID:
+        return raw
+    lower = raw.lower()
+    if "vegano" in lower:
+        return "Vegano"
+    if "vegetariano" in lower:
+        return "Vegetariano"
+    return "Ninguno"
+
+def classify_dishes(dish_names: list[str]) -> dict[str, str]:
+    return {name: classify_dish(name) for name in dish_names}
