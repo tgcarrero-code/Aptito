@@ -1,43 +1,49 @@
-
 import os
+import json
+import re
+import streamlit as st
 from openai import OpenAI
-from dotenv import load_dotenv
 
-load_dotenv()
+_client = None
 
-class FoodClassifier:
-    def __init__(self):
-        self.client = OpenAI(
-            base_url="https://api.deepseek.com",
-            api_key=os.getenv("DEEPSEEK_API_KEY"),
-        )
-
-    def classify_dish(self, dish_name: str) -> dict:
-        if not self.client.api_key:
-            return {"label": "error", "reason": "DEEPSEEK_API_KEY not set."}
-
-        prompt = (
-            f"Classify the following dish '{dish_name}' as 'vegano' (vegan), "
-            f"'vegetariano' (vegetarian), or 'no_apto' (not suitable for vegans/vegetarians). "
-            f"Provide a concise reason for the classification. "
-            f"Respond with a JSON object like: "
-            f"{{'label': 'vegano/vegetariano/no_apto', 'reason': '...'}}"
-        )
-
+def _get_client() -> OpenAI:
+    global _client
+    if _client is None:
+        # Try st.secrets first (Streamlit Cloud), then env var (local)
         try:
-            chat_completion = self.client.chat.completions.create(
-                model="deepseek-chat",
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.3,
-            )
-            response_content = chat_completion.choices[0].message.content
-            import json
-            return json.loads(response_content)
-        except Exception as e:
-            return {"label": "error", "reason": f"API call failed: {e}"}
+            api_key = st.secrets["DEEPSEEK_API_KEY"]
+        except Exception:
+            api_key = os.getenv("DEEPSEEK_API_KEY")
+        _client = OpenAI(
+            api_key=api_key,
+            base_url="https://api.deepseek.com",
+        )
+    return _client
 
-if __name__ == "__main__":
-    classifier = FoodClassifier()
-    print(classifier.classify_dish("Lomo Saltado"))
-    print(classifier.classify_dish("Ceviche de champiñones"))
-    print(classifier.classify_dish("Ensalada de quinua"))
+def classify_dish(dish: str) -> dict:
+    client = _get_client()
+    system_prompt = (
+        "Eres un experto en nutrición y dietas vegetarianas y veganas. "
+        "Clasificas platos de comida peruana y limeña de forma precisa y consistente."
+    )
+    user_prompt = (
+        f'Clasifica el plato: "{dish}"\n'
+        'Responde ÚNICAMENTE con JSON: {"label": "vegano|vegetariano|no_apto", "reason": "explicación"}\n'
+        'Sin texto adicional ni markdown.'
+    )
+    response = client.chat.completions.create(
+        model="deepseek-chat",
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        temperature=0.0,
+        max_tokens=150,
+    )
+    content = response.choices[0].message.content.strip()
+    content = re.sub(r"```json\s*", "", content)
+    content = re.sub(r"```\s*", "", content).strip()
+    result = json.loads(content)
+    if result.get("label") not in ("vegano", "vegetariano", "no_apto"):
+        result["label"] = "no_apto"
+    return result
