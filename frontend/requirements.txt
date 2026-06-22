@@ -4,4 +4,3 @@ folium
 openai
 paddleocr
 pillow
-python-dotenv
