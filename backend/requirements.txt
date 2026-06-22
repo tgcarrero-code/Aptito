@@ -1,0 +1,8 @@
+
+fastapi
+uvicorn
+paddleocr
+paddlepaddle
+openai
+python-dotenv
+pillow
