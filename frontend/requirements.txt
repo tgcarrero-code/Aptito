@@ -3,6 +3,5 @@ streamlit-folium
 folium
 openai
 paddleocr
-paddlepaddle
 pillow
 python-dotenv
