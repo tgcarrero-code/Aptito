@@ -5,6 +5,7 @@ import tempfile
 import subprocess
 
 import streamlit as st
+st.write("App iniciando...")
 import folium
 from streamlit_folium import st_folium
 
