@@ -2,10 +2,8 @@ import os
 import sys
 import json
 import tempfile
-import subprocess
 
 import streamlit as st
-st.write("App iniciando...")
 import folium
 from streamlit_folium import st_folium
 
@@ -122,7 +120,7 @@ def render_restaurant_card(restaurant: dict, classifications: dict, wanted: set)
 def render_ocr_section(classifications_cache: dict) -> None:
     st.divider()
     st.subheader("📷 Clasificar menú desde foto")
-    st.caption("Sube una imagen de un menú y PaddleOCR extraerá el texto; luego DeepSeek clasificará cada línea.")
+    st.caption("Sube una imagen de un menú y la IA extraerá el texto y clasificará cada plato.")
     uploaded = st.file_uploader("Selecciona imagen del menú", type=["png", "jpg", "jpeg", "webp"])
     if uploaded is None:
         return
@@ -133,15 +131,14 @@ def render_ocr_section(classifications_cache: dict) -> None:
     with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
         tmp.write(uploaded.read())
         tmp_path = tmp.name
-    with st.spinner("Extrayendo texto con PaddleOCR…"):
+    with st.spinner("Extrayendo texto con OCR…"):
         try:
             if "ocr_engine" not in st.session_state:
-                subprocess.run(["apt-get", "install", "-y", "libgl1"], capture_output=True)
-                from paddleocr import PaddleOCR
-                st.session_state.ocr_engine = PaddleOCR(use_angle_cls=True, lang="en")
-            ocr_result = st.session_state.ocr_engine.ocr(tmp_path, cls=True)
+                import easyocr
+                st.session_state.ocr_engine = easyocr.Reader(['es', 'en'])
+            ocr_result = st.session_state.ocr_engine.readtext(tmp_path)
         except Exception as exc:
-            st.error(f"Error en PaddleOCR: {exc}")
+            st.error(f"Error en OCR: {exc}")
             os.unlink(tmp_path)
             return
         finally:
@@ -150,9 +147,9 @@ def render_ocr_section(classifications_cache: dict) -> None:
             except OSError:
                 pass
     lines = []
-    if ocr_result and ocr_result[0]:
-        for block in ocr_result[0]:
-            text = block[1][0].strip()
+    if ocr_result:
+        for detection in ocr_result:
+            text = detection[1].strip()
             if text:
                 lines.append(text)
     if not lines:
