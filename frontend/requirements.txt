@@ -2,5 +2,6 @@ streamlit
 streamlit-folium
 folium
 openai
-paddleocr
+easyocr
 pillow
+python-dotenv
