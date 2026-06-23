@@ -131,8 +131,10 @@ def render_ocr_section(classifications_cache: dict) -> None:
     with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
         tmp.write(uploaded.read())
         tmp_path = tmp.name
-    with st.spinner("Extrayendo texto con PaddleOCR…"):
+with st.spinner("Extrayendo texto con PaddleOCR…"):
         try:
+            import subprocess
+            subprocess.run(["apt-get", "install", "-y", "libgl1"], capture_output=True)
             from paddleocr import PaddleOCR
             ocr_engine = PaddleOCR(use_angle_cls=True, lang="en")
             ocr_result = ocr_engine.ocr(tmp_path, cls=True)
