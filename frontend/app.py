@@ -134,10 +134,11 @@ def render_ocr_section(classifications_cache: dict) -> None:
         tmp_path = tmp.name
     with st.spinner("Extrayendo texto con PaddleOCR…"):
         try:
-            subprocess.run(["apt-get", "install", "-y", "libgl1"], capture_output=True)
-            from paddleocr import PaddleOCR
-            ocr_engine = PaddleOCR(use_angle_cls=True, lang="en")
-            ocr_result = ocr_engine.ocr(tmp_path, cls=True)
+            if "ocr_engine" not in st.session_state:
+                subprocess.run(["apt-get", "install", "-y", "libgl1"], capture_output=True)
+                from paddleocr import PaddleOCR
+                st.session_state.ocr_engine = PaddleOCR(use_angle_cls=True, lang="en")
+            ocr_result = st.session_state.ocr_engine.ocr(tmp_path, cls=True)
         except Exception as exc:
             st.error(f"Error en PaddleOCR: {exc}")
             os.unlink(tmp_path)
